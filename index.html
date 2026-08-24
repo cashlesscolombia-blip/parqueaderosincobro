@@ -391,10 +391,10 @@
 const SUPABASE_URL = 'https://jeamajrktqusixlnvlgy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImplYW1hanJrdHF1c2l4bG52bGd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTk2NTgsImV4cCI6MjEwMzE3NTY1OH0.GlsvO6eH3y_PMdCVyIa3N_5l8zfwip1gTiz5YbVKhfI';
 
-let supabase = null;
+let sb = null;
 
 function tryInitSupabase(){
-  if(supabase) return true;
+  if(sb) return true;
   if(SUPABASE_URL.includes('TU-PROYECTO')){
     document.getElementById('configBanner')?.classList.remove('hidden');
     return false;
@@ -403,7 +403,7 @@ function tryInitSupabase(){
     return false; // la librería del CDN todavía no ha cargado
   }
   try{
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log('✅ Supabase conectado correctamente a', SUPABASE_URL);
     document.getElementById('configBanner')?.classList.add('hidden');
     return true;
@@ -419,7 +419,7 @@ const initRetry = setInterval(()=>{
   initAttempts++;
   if(tryInitSupabase() || initAttempts > 25){
     clearInterval(initRetry);
-    if(!supabase && !SUPABASE_URL.includes('TU-PROYECTO')){
+    if(!sb && !SUPABASE_URL.includes('TU-PROYECTO')){
       console.error('❌ No se pudo cargar la librería de Supabase (window.supabase sigue sin existir). Revisa la consola Network o si un bloqueador de anuncios/firewall está bloqueando cdn.jsdelivr.net.');
       document.getElementById('configBanner')?.classList.remove('hidden');
       const banner = document.getElementById('configBanner');
@@ -452,8 +452,8 @@ function toast(msg, isErr=false){
 }
 function genTicketCode(){ return 'TCK-'+Date.now().toString(36).toUpperCase()+'-'+Math.floor(Math.random()*900+100); }
 function requireSupabase(){
-  if(!supabase) tryInitSupabase();
-  if(!supabase){ toast('Configura SUPABASE_URL y SUPABASE_ANON_KEY primero.', true); return false; }
+  if(!sb) tryInitSupabase();
+  if(!sb){ toast('Configura SUPABASE_URL y SUPABASE_ANON_KEY primero.', true); return false; }
   return true;
 }
 
@@ -469,13 +469,13 @@ function setLoginMode(mode){
 }
 
 async function checkEmailState(){
-  if(!supabase) tryInitSupabase();
-  if(!supabase) return;
+  if(!sb) tryInitSupabase();
+  if(!sb) return;
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const wrap = document.getElementById('pinInputWrap');
   document.getElementById('pinReveal').classList.add('hidden');
   if(!email || !/^\S+@\S+\.\S+$/.test(email)){ wrap.style.display = 'none'; return; }
-  const { data, error } = await supabase.rpc('client_exists', { p_email: email });
+  const { data, error } = await sb.rpc('client_exists', { p_email: email });
   if(error){ console.error(error); return; }
   wrap.style.display = data ? 'block' : 'none';
 }
@@ -490,18 +490,18 @@ async function handleClientLogin(){
   const btn = document.getElementById('clientLoginBtn');
   btn.disabled = true;
   try{
-    const { data: exists, error: existsErr } = await supabase.rpc('client_exists', { p_email: email });
+    const { data: exists, error: existsErr } = await sb.rpc('client_exists', { p_email: email });
     if(existsErr) throw existsErr;
 
     if(exists){
       const pin = document.getElementById('loginPin').value.trim();
       if(pin.length !== 4){ errEl.textContent = 'Ingresa tu clave de 4 dígitos.'; return; }
-      const { data: ok, error: verErr } = await supabase.rpc('client_verify_pin', { p_email: email, p_pin: pin });
+      const { data: ok, error: verErr } = await sb.rpc('client_verify_pin', { p_email: email, p_pin: pin });
       if(verErr) throw verErr;
       if(!ok){ errEl.textContent = 'Clave incorrecta.'; return; }
       startClientSession(email);
     } else {
-      const { data: newPin, error: regErr } = await supabase.rpc('client_register', { p_email: email });
+      const { data: newPin, error: regErr } = await sb.rpc('client_register', { p_email: email });
       if(regErr) throw regErr;
       pendingNewUserEmail = email;
       document.getElementById('pinRevealValue').textContent = newPin;
@@ -537,7 +537,7 @@ async function handleAdminLogin(){
   const btn = document.getElementById('adminLoginBtn');
   btn.disabled = true;
   try{
-    const { data: ok, error } = await supabase.rpc('admin_login', { p_username: u, p_password: p });
+    const { data: ok, error } = await sb.rpc('admin_login', { p_username: u, p_password: p });
     if(error) throw error;
     if(ok){
       session = {role:'admin'};
@@ -600,7 +600,7 @@ function adminNav(panel){
    PUNTOS DE ACCESO
 ========================================================= */
 async function loadAccessPoints(){
-  const { data, error } = await supabase.from('access_points').select('*').order('created_at');
+  const { data, error } = await sb.from('access_points').select('*').order('created_at');
   if(error){ console.error(error); accessPointsCache = []; return; }
   accessPointsCache = data || [];
 }
@@ -613,7 +613,7 @@ async function createPoint(){
   const name = document.getElementById('pointName').value.trim();
   const type = document.getElementById('pointType').value;
   if(!name){ toast('Ingresa un nombre para el punto.', true); return; }
-  const { error } = await supabase.from('access_points').insert({ name, type });
+  const { error } = await sb.from('access_points').insert({ name, type });
   if(error){ console.error(error); toast('No se pudo crear el punto.', true); return; }
   document.getElementById('pointName').value = '';
   await loadAccessPoints();
@@ -621,7 +621,7 @@ async function createPoint(){
   toast('Punto de acceso creado.');
 }
 async function deletePoint(id){
-  const { error } = await supabase.from('access_points').delete().eq('id', id);
+  const { error } = await sb.from('access_points').delete().eq('id', id);
   if(error){ console.error(error); toast('No se pudo eliminar el punto.', true); return; }
   await loadAccessPoints();
   renderPoints();
@@ -651,7 +651,7 @@ async function generateTicket(){
   if(!pointId){ toast('Debes seleccionar un punto de acceso.', true); return; }
 
   const code = genTicketCode();
-  const { error } = await supabase.from('tickets').insert({
+  const { error } = await sb.from('tickets').insert({
     code, plate: plateRaw, client_email: session.email, point_id: pointId, used:false
   });
   if(error){ console.error(error); toast('No se pudo generar el ticket.', true); return; }
@@ -712,9 +712,9 @@ async function uploadPlatePhoto(videoEl, tagPrefix){
   const blob = await snapshotBlob(videoEl);
   if(!blob) return null;
   const path = `${tagPrefix}-${Date.now()}.jpg`;
-  const { error } = await supabase.storage.from('plate-photos').upload(path, blob, { contentType:'image/jpeg' });
+  const { error } = await sb.storage.from('plate-photos').upload(path, blob, { contentType:'image/jpeg' });
   if(error){ console.error('Error subiendo foto', error); return null; }
-  const { data } = supabase.storage.from('plate-photos').getPublicUrl(path);
+  const { data } = sb.storage.from('plate-photos').getPublicUrl(path);
   return data ? data.publicUrl : null;
 }
 
@@ -771,26 +771,26 @@ async function processScan(code, plateCamVideoEl){
   if(!requireSupabase()) return;
   if(clientScanRAF) cancelAnimationFrame(clientScanRAF);
 
-  const { data: ticket, error: tErr } = await supabase.from('tickets').select('*').eq('code', code).maybeSingle();
+  const { data: ticket, error: tErr } = await sb.from('tickets').select('*').eq('code', code).maybeSingle();
   if(tErr || !ticket){ toast('Código no reconocido.', true); resumeScanIfNeeded(); return; }
 
   const pointName = (accessPointsCache.find(p=>p.id===ticket.point_id)||{}).name || '—';
   const photoUrl = await uploadPlatePhoto(plateCamVideoEl, ticket.plate);
 
   if(!ticket.used){
-    await supabase.from('tickets').update({ used:true }).eq('code', code);
-    const { error: insErr } = await supabase.from('entries').insert({
+    await sb.from('tickets').update({ used:true }).eq('code', code);
+    const { error: insErr } = await sb.from('entries').insert({
       plate: ticket.plate, client_email: ticket.client_email, ticket_code: code,
       entry_time: nowIso(), entry_point_id: ticket.point_id, entry_photo_url: photoUrl, status:'dentro'
     });
     if(insErr){ console.error(insErr); toast('Error registrando el ingreso.', true); }
     else toast(`Ingreso registrado: ${ticket.plate} en ${pointName}.`);
   } else {
-    const { data: openEntry } = await supabase.from('entries')
+    const { data: openEntry } = await sb.from('entries')
       .select('*').eq('ticket_code', code).eq('status','dentro')
       .order('entry_time', {ascending:false}).limit(1).maybeSingle();
     if(openEntry){
-      await supabase.from('entries').update({
+      await sb.from('entries').update({
         exit_time: nowIso(), exit_point_id: ticket.point_id, exit_photo_url: photoUrl, status:'salio'
       }).eq('id', openEntry.id);
       toast(`Salida registrada: ${ticket.plate} por ${pointName}.`);
@@ -809,8 +809,8 @@ function resumeScanIfNeeded(){
    CLIENTE: HISTORIAL
 ========================================================= */
 async function renderClientHistory(){
-  if(!session || session.role!=='cliente' || !supabase) return;
-  const { data, error } = await supabase.from('entries')
+  if(!session || session.role!=='cliente' || !sb) return;
+  const { data, error } = await sb.from('entries')
     .select('*').eq('client_email', session.email)
     .order('entry_time', {ascending:false});
   const body = document.getElementById('clientHistoryBody');
@@ -858,8 +858,8 @@ function stopAdminCams(){
    ADMIN: INGRESOS / SALIDAS
 ========================================================= */
 async function renderAdminEntries(){
-  if(!supabase) return;
-  const { data, error } = await supabase.from('entries').select('*').order('entry_time', {ascending:false});
+  if(!sb) return;
+  const { data, error } = await sb.from('entries').select('*').order('entry_time', {ascending:false});
   const body = document.getElementById('adminEntriesBody');
   if(error){ body.innerHTML = `<tr><td colspan="10" class="empty">Error cargando ingresos.</td></tr>`; return; }
   if(!data || !data.length){ body.innerHTML = `<tr><td colspan="10" class="empty">No hay ingresos registrados todavía.</td></tr>`; return; }
@@ -881,7 +881,7 @@ async function renderAdminEntries(){
   `).join('');
 }
 async function forceExit(id){
-  const { error } = await supabase.from('entries').update({ exit_time: nowIso(), status:'salio' }).eq('id', id);
+  const { error } = await sb.from('entries').update({ exit_time: nowIso(), status:'salio' }).eq('id', id);
   if(error){ console.error(error); toast('No se pudo registrar la salida.', true); return; }
   await renderAdminEntries();
   toast('Salida registrada manualmente.');
