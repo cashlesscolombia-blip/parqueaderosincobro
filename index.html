@@ -392,15 +392,41 @@ const SUPABASE_URL = 'https://jeamajrktqusixlnvlgy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImplYW1hanJrdHF1c2l4bG52bGd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTk2NTgsImV4cCI6MjEwMzE3NTY1OH0.GlsvO6eH3y_PMdCVyIa3N_5l8zfwip1gTiz5YbVKhfI';
 
 let supabase = null;
-try{
-  if(!SUPABASE_URL.includes('TU-PROYECTO')){
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  } else {
-    document.addEventListener('DOMContentLoaded', ()=>{
-      document.getElementById('configBanner').classList.remove('hidden');
-    });
+
+function tryInitSupabase(){
+  if(supabase) return true;
+  if(SUPABASE_URL.includes('TU-PROYECTO')){
+    document.getElementById('configBanner')?.classList.remove('hidden');
+    return false;
   }
-}catch(e){ console.error('Error inicializando Supabase', e); }
+  if(typeof window.supabase === 'undefined' || !window.supabase.createClient){
+    return false; // la librería del CDN todavía no ha cargado
+  }
+  try{
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('✅ Supabase conectado correctamente a', SUPABASE_URL);
+    document.getElementById('configBanner')?.classList.add('hidden');
+    return true;
+  }catch(e){
+    console.error('❌ Error creando el cliente de Supabase:', e);
+    return false;
+  }
+}
+
+// Reintenta cada 200ms durante 5s por si el <script> del CDN tarda en cargar
+let initAttempts = 0;
+const initRetry = setInterval(()=>{
+  initAttempts++;
+  if(tryInitSupabase() || initAttempts > 25){
+    clearInterval(initRetry);
+    if(!supabase && !SUPABASE_URL.includes('TU-PROYECTO')){
+      console.error('❌ No se pudo cargar la librería de Supabase (window.supabase sigue sin existir). Revisa la consola Network o si un bloqueador de anuncios/firewall está bloqueando cdn.jsdelivr.net.');
+      document.getElementById('configBanner')?.classList.remove('hidden');
+      const banner = document.getElementById('configBanner');
+      if(banner) banner.textContent = '⚠️ No se pudo cargar la librería de Supabase desde el CDN. Revisa tu conexión o si algo está bloqueando cdn.jsdelivr.net.';
+    }
+  }
+}, 200);
 
 /* =========================================================
    ESTADO EN MEMORIA (no se guarda ninguna clave aquí,
@@ -426,6 +452,7 @@ function toast(msg, isErr=false){
 }
 function genTicketCode(){ return 'TCK-'+Date.now().toString(36).toUpperCase()+'-'+Math.floor(Math.random()*900+100); }
 function requireSupabase(){
+  if(!supabase) tryInitSupabase();
   if(!supabase){ toast('Configura SUPABASE_URL y SUPABASE_ANON_KEY primero.', true); return false; }
   return true;
 }
@@ -442,6 +469,7 @@ function setLoginMode(mode){
 }
 
 async function checkEmailState(){
+  if(!supabase) tryInitSupabase();
   if(!supabase) return;
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const wrap = document.getElementById('pinInputWrap');
