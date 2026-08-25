@@ -789,18 +789,23 @@ document.getElementById('ticketBtn').addEventListener('click', async ()=>{
   const codigo = Date.now().toString(36).toUpperCase().slice(-5) + Math.floor(Math.random()*90+10);
   const ahora = new Date();
 
-  const { data, error } = await sb.from('tickets').insert({
-    placa: placa,
-    codigo_barras: codigo,
-    estado: 'activo'
-  }).select().single();
+  try{
+    const { data, error } = await sb.from('tickets').insert({
+      placa: placa,
+      codigo_barras: codigo,
+      estado: 'activo'
+    }).select().single();
 
-  if(error){
-    showMsg(plateMsg, 'No se pudo registrar el ingreso: ' + error.message, false);
-    return;
+    if(error){
+      showMsg(plateMsg, 'No se pudo registrar el ingreso: ' + error.message, false);
+      return;
+    }
+    plateMsg.className = 'msg';
+    renderTicket(data, ahora);
+  }catch(e){
+    showMsg(plateMsg, 'Error inesperado al generar el ticket: ' + e.message, false);
+    console.error(e);
   }
-  plateMsg.className = 'msg';
-  renderTicket(data, ahora);
 });
 
 function resetTicketForm(){
@@ -828,17 +833,43 @@ function renderTicket(reg, fecha){
       <button class="btn btn-teal" id="newTicketBtn">+ Nuevo ingreso</button>
     </div>
   `;
-  JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, displayValue:true});
-  document.getElementById('printBtn').addEventListener('click', ()=> window.print());
-  document.getElementById('newTicketBtn').addEventListener('click', resetTicketForm);
 
-  // Imprime automáticamente el ticket recién generado y, al terminar
-  // (o cancelar) la impresión, refresca el formulario para un nuevo ingreso.
+  // Botones y flujo de impresión: se activan SIEMPRE, sin importar
+  // si el dibujo del código de barras (más abajo) tiene éxito o no.
+  const printBtnEl = document.getElementById('printBtn');
+  const newTicketBtnEl = document.getElementById('newTicketBtn');
+  printBtnEl.addEventListener('click', ()=> window.print());
+  newTicketBtnEl.addEventListener('click', resetTicketForm);
+
   window.onafterprint = ()=>{
     window.onafterprint = null;
     resetTicketForm();
   };
-  setTimeout(()=> window.print(), 300);
+
+  // Se dispara la impresión automática ya mismo (sin retraso) para
+  // conservar el "gesto del usuario" que abrió el diálogo de impresión
+  // en la mayoría de navegadores; con setTimeout algunos navegadores
+  // lo bloquean silenciosamente por no venir de una acción directa.
+  try{
+    window.print();
+  }catch(e){
+    console.warn('No se pudo lanzar la impresión automática:', e);
+  }
+
+  // Dibujo del código de barras: aislado en su propio try/catch y
+  // diferido un frame para asegurar que el SVG ya esté visible en
+  // el DOM. Si falla, el ticket sigue siendo válido (queda el
+  // código en texto) y no afecta a los botones ni a la impresión.
+  requestAnimationFrame(()=>{
+    try{
+      if(typeof JsBarcode === 'undefined'){
+        throw new Error('La librería JsBarcode no se cargó (revisa la conexión a internet / CDN).');
+      }
+      JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, displayValue:true});
+    }catch(e){
+      console.warn('No se pudo dibujar el código de barras:', e);
+    }
+  });
 }
 
 /* =========================================================
@@ -1023,7 +1054,11 @@ async function verDetalle(id){
     <button class="btn btn-red" style="width:100%;justify-content:center;margin-top:16px;" onclick="eliminarTicket('${t.id}');closeModal();">Eliminar registro</button>
   `;
   document.getElementById('modalBack').classList.add('show');
-  JsBarcode('#modalBarcode', t.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, background:'transparent', lineColor:'#edeff2'});
+  try{
+    JsBarcode('#modalBarcode', t.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, background:'transparent', lineColor:'#edeff2'});
+  }catch(e){
+    console.warn('No se pudo dibujar el código de barras del modal:', e);
+  }
 }
 function closeModal(){ document.getElementById('modalBack').classList.remove('show'); }
 document.getElementById('modalClose').addEventListener('click', closeModal);
