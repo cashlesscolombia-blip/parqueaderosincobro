@@ -138,6 +138,13 @@
     font-size:14px;cursor:pointer;
   }
   .keypad button:hover{border-color:var(--amber);color:var(--amber);}
+  .keypad button.key-num{
+    color:var(--amber);border-color:rgba(233,166,52,.45);background:rgba(233,166,52,.08);
+  }
+  .keypad button.key-num:hover{background:rgba(233,166,52,.18);}
+  .keypad button.key-let{
+    font-size:19px;font-weight:800;
+  }
   .keypad-actions{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap;}
   @media (max-width:520px){.keypad{grid-template-columns:repeat(6,1fr);}}
 
@@ -171,7 +178,7 @@
     #ticketCard > h2{ display:none !important; }
     .ticket-actions{ display:none !important; }
     #printTicket{
-      width:100%; max-width:100%; margin:0; padding:0; box-shadow:none; border:none;
+      width:100%; max-width:100%; margin:0; padding:6px 8px; box-shadow:none; border:none;
       background-image:none !important; font-size:15px;
     }
     #printTicket h3{ font-size:20px; }
@@ -644,6 +651,7 @@ const KEYS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 KEYS.forEach(k=>{
   const b = document.createElement('button');
   b.textContent = k;
+  b.classList.add(/[0-9]/.test(k) ? 'key-num' : 'key-let');
   b.addEventListener('click', ()=> appendChar(k));
   keypadEl.appendChild(b);
 });
@@ -953,20 +961,25 @@ async function validarTicket(codigo){
       <div class="cam-hint">Salida registrada el ${new Date(data.fecha_salida).toLocaleString('es-CO')}</div></div>`;
     return;
   }
-  box.innerHTML = `<div class="verdict valido"><div class="icon">✓</div><h3>Ticket válido</h3>
+  box.innerHTML = `<div class="verdict valido"><div class="icon">✓</div><h3>Registrando salida…</h3>
     <div class="plate-big">${data.placa}</div>
-    <div class="cam-hint">Ingresó el ${new Date(data.fecha_ingreso).toLocaleString('es-CO')}</div>
-    <button class="btn btn-teal" style="margin-top:12px;" id="confirmExitBtn">Registrar salida</button></div>`;
+    <div class="cam-hint">Ingresó el ${new Date(data.fecha_ingreso).toLocaleString('es-CO')}</div></div>`;
 
-  document.getElementById('confirmExitBtn').addEventListener('click', async ()=>{
-    await sb.from('tickets').update({
-      estado:'salido', fecha_salida: new Date().toISOString(),
-      controlador_salida: currentControlador ? currentControlador.usuario : null
-    }).eq('id', data.id);
-    box.innerHTML = `<div class="verdict valido"><div class="icon">✓</div><h3>Salida registrada</h3>
-      <div class="plate-big">${data.placa}</div></div>`;
-    scanInput.focus();
-  });
+  const { error: updError } = await sb.from('tickets').update({
+    estado:'salido', fecha_salida: new Date().toISOString(),
+    controlador_salida: currentControlador ? currentControlador.usuario : null
+  }).eq('id', data.id);
+
+  if(updError){
+    box.innerHTML = `<div class="verdict invalido"><div class="icon">✕</div><h3>No se pudo registrar la salida</h3>
+      <div class="plate-big">${data.placa}</div>
+      <div class="cam-hint">${updError.message}</div></div>`;
+    return;
+  }
+
+  box.innerHTML = `<div class="verdict valido"><div class="icon">✓</div><h3>Salida registrada</h3>
+    <div class="plate-big">${data.placa}</div></div>`;
+  scanInput.focus();
 }
 document.getElementById('view-controlador').addEventListener('click', ()=> scanInput && scanInput.focus());
 
