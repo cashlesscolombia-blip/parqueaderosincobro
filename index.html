@@ -792,7 +792,6 @@ document.getElementById('ticketBtn').addEventListener('click', async ()=>{
   const { data, error } = await sb.from('tickets').insert({
     placa: placa,
     codigo_barras: codigo,
-    code: codigo,
     estado: 'activo'
   }).select().single();
 
