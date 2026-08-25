@@ -786,12 +786,13 @@ document.getElementById('ticketBtn').addEventListener('click', async ()=>{
     showMsg(plateMsg, 'Formato de placa inválido. Carro: AAA123 · Moto: AAA12A.', false);
     return;
   }
-  const codigo = 'TK' + Date.now().toString(36).toUpperCase() + Math.floor(Math.random()*90+10);
+  const codigo = Date.now().toString(36).toUpperCase().slice(-5) + Math.floor(Math.random()*90+10);
   const ahora = new Date();
 
   const { data, error } = await sb.from('tickets').insert({
     placa: placa,
     codigo_barras: codigo,
+    code: codigo,
     estado: 'activo'
   }).select().single();
 
@@ -802,6 +803,12 @@ document.getElementById('ticketBtn').addEventListener('click', async ()=>{
   plateMsg.className = 'msg';
   renderTicket(data, ahora);
 });
+
+function resetTicketForm(){
+  plateValue=''; renderPlate();
+  ticketCard.style.display='none';
+  plateCard.scrollIntoView({behavior:'smooth'});
+}
 
 function renderTicket(reg, fecha){
   ticketCard.style.display='block';
@@ -822,13 +829,17 @@ function renderTicket(reg, fecha){
       <button class="btn btn-teal" id="newTicketBtn">+ Nuevo ingreso</button>
     </div>
   `;
-  JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6});
+  JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, displayValue:true});
   document.getElementById('printBtn').addEventListener('click', ()=> window.print());
-  document.getElementById('newTicketBtn').addEventListener('click', ()=>{
-    plateValue=''; renderPlate();
-    ticketCard.style.display='none';
-    plateCard.scrollIntoView({behavior:'smooth'});
-  });
+  document.getElementById('newTicketBtn').addEventListener('click', resetTicketForm);
+
+  // Imprime automáticamente el ticket recién generado y, al terminar
+  // (o cancelar) la impresión, refresca el formulario para un nuevo ingreso.
+  window.onafterprint = ()=>{
+    window.onafterprint = null;
+    resetTicketForm();
+  };
+  setTimeout(()=> window.print(), 300);
 }
 
 /* =========================================================
