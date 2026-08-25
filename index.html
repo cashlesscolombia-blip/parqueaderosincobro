@@ -157,6 +157,17 @@
   .ticket svg{display:block;margin:10px auto 0;max-width:100%;}
   .ticket-actions{display:flex;gap:8px;justify-content:center;margin-top:14px;}
 
+  /* Al imprimir, oculta toda la página y muestra SOLO el ticket */
+  @media print{
+    body *{ visibility:hidden; }
+    #printTicket, #printTicket *{ visibility:visible; }
+    #printTicket{
+      position:fixed; top:0; left:0; width:100%;
+      margin:0; box-shadow:none; border:none;
+    }
+    .ticket-actions{ display:none !important; }
+  }
+
   /* ---------- Formularios login ---------- */
   .login-box{max-width:340px;margin:30px auto;text-align:center;}
   .login-box .mark-lg{
@@ -834,8 +845,8 @@ function renderTicket(reg, fecha){
     </div>
   `;
 
-  // Botones y flujo de impresión: se activan SIEMPRE, sin importar
-  // si el dibujo del código de barras (más abajo) tiene éxito o no.
+  // Botones: se activan siempre, sin importar si el código de
+  // barras logra dibujarse o no.
   const printBtnEl = document.getElementById('printBtn');
   const newTicketBtnEl = document.getElementById('newTicketBtn');
   printBtnEl.addEventListener('click', ()=> window.print());
@@ -846,30 +857,28 @@ function renderTicket(reg, fecha){
     resetTicketForm();
   };
 
-  // Se dispara la impresión automática ya mismo (sin retraso) para
-  // conservar el "gesto del usuario" que abrió el diálogo de impresión
-  // en la mayoría de navegadores; con setTimeout algunos navegadores
-  // lo bloquean silenciosamente por no venir de una acción directa.
+  // 1) Dibuja el código de barras PRIMERO y de forma síncrona —
+  //    window.print() congela la página al abrir el diálogo, así
+  //    que si el barcode no está dibujado antes de imprimir, sale
+  //    en blanco en el ticket impreso.
+  try{
+    if(typeof JsBarcode === 'undefined'){
+      throw new Error('La librería JsBarcode no se cargó (revisa la conexión a internet / CDN).');
+    }
+    JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, displayValue:true});
+  }catch(e){
+    console.warn('No se pudo dibujar el código de barras:', e);
+  }
+
+  // 2) Ya con el ticket completo y visible en pantalla, se lanza
+  //    la impresión automática (llamada directa, sin setTimeout,
+  //    para conservar el "gesto del usuario" en la mayoría de
+  //    navegadores; con retraso algunos la bloquean en silencio).
   try{
     window.print();
   }catch(e){
     console.warn('No se pudo lanzar la impresión automática:', e);
   }
-
-  // Dibujo del código de barras: aislado en su propio try/catch y
-  // diferido un frame para asegurar que el SVG ya esté visible en
-  // el DOM. Si falla, el ticket sigue siendo válido (queda el
-  // código en texto) y no afecta a los botones ni a la impresión.
-  requestAnimationFrame(()=>{
-    try{
-      if(typeof JsBarcode === 'undefined'){
-        throw new Error('La librería JsBarcode no se cargó (revisa la conexión a internet / CDN).');
-      }
-      JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, displayValue:true});
-    }catch(e){
-      console.warn('No se pudo dibujar el código de barras:', e);
-    }
-  });
 }
 
 /* =========================================================
