@@ -154,18 +154,31 @@
   .ticket .row{display:flex;justify-content:space-between;font-size:12px;margin:5px 0;}
   .ticket .row b{font-weight:700;}
   .ticket .plate-big{text-align:center;font-size:26px;font-weight:700;letter-spacing:.1em;margin:10px 0;}
-  .ticket svg{display:block;margin:10px auto 0;max-width:100%;}
+  .ticket svg{display:block;margin:10px auto 0;max-width:100%;width:100%;height:auto;}
   .ticket-actions{display:flex;gap:8px;justify-content:center;margin-top:14px;}
 
   /* Al imprimir, oculta toda la página y muestra SOLO el ticket */
+  /* Al imprimir: solo el ticket, en una sola hoja del ancho de la
+     impresora térmica, con alto automático (así el driver corta
+     justo al final del contenido en vez de dejar hojas en blanco). */
   @media print{
-    body *{ visibility:hidden; }
-    #printTicket, #printTicket *{ visibility:visible; }
-    #printTicket{
-      position:fixed; top:0; left:0; width:100%;
-      margin:0; box-shadow:none; border:none;
-    }
+    @page{ size: 58mm auto; margin: 2mm; }
+    html, body{ width:58mm; }
+    body > *:not(main){ display:none !important; }
+    main > *:not(#view-cliente){ display:none !important; }
+    #view-cliente > *:not(#ticketCard){ display:none !important; }
+    #ticketCard{ display:block !important; box-shadow:none; border:none; padding:0; margin:0; }
+    #ticketCard > h2{ display:none !important; }
     .ticket-actions{ display:none !important; }
+    #printTicket{
+      width:100%; max-width:100%; margin:0; padding:0; box-shadow:none; border:none;
+      background-image:none !important; font-size:15px;
+    }
+    #printTicket h3{ font-size:20px; }
+    #printTicket .plate-big{ font-size:34px; }
+    #printTicket .row{ font-size:15px; }
+    #printTicket .sub{ font-size:12px; }
+    #printTicket svg{ width:100% !important; height:auto !important; }
   }
 
   /* ---------- Formularios login ---------- */
@@ -865,7 +878,7 @@ function renderTicket(reg, fecha){
     if(typeof JsBarcode === 'undefined'){
       throw new Error('La librería JsBarcode no se cargó (revisa la conexión a internet / CDN).');
     }
-    JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:2, height:50, fontSize:12, margin:6, displayValue:true});
+    JsBarcode('#barcodeSvg', reg.codigo_barras, {format:'CODE128', width:3, height:90, fontSize:18, margin:8, displayValue:true});
   }catch(e){
     console.warn('No se pudo dibujar el código de barras:', e);
   }
